@@ -1,0 +1,27 @@
+import pandas as pd
+import os
+import numpy as np
+
+path = r"f:\python_work\targets"
+os.chdir(path)
+
+ingre = pd.read_table("ingredients.txt",header=None)
+
+targets = pd.read_table("targets.txt",header = None)
+
+df1 = targets                 
+df2 = ingre
+
+index = df1[0].isin(df2[0])     #用2中的行名去筛选1中共有行名的行
+
+outfile = df1[index]
+
+targetname = pd.read_table("targetName.txt")
+
+outfile = outfile[[0,1,2]]
+
+outfile.to_csv("targetname.csv",header=["MolId","MolName","Target"])
+
+res = targetname.values.ravel() == outfile.values.ravel()     ## 比较两个dataframe是否相同
+
+np.unique(res)
