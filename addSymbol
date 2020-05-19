@@ -1,0 +1,43 @@
+uniprot = pd.read_table("uniprot.tsv",header=0)
+
+uniprot.shape
+
+uniprot.Organism.value_counts()
+
+uniprot.Status.value_counts()
+
+uniprot = uniprot[uniprot.Status == "reviewed"]
+
+uniprot.shape
+
+uniprot.head()
+
+import re
+
+uniprot["protein_1"] = uniprot["Protein names"].apply(lambda x:re.sub('\(.*$',"",x).strip())
+
+uniprot["protein_1"].apply(lambda x:"[" in x).value_counts()
+
+uniprot["protein_2"] = uniprot["protein_1"].apply(lambda x:re.sub('\[.*$',"",x).strip())
+
+uniprot.info()
+
+uniprot["genesymbol"] = uniprot["Gene names"].apply(lambda x:re.sub('\s.*$',"",str(x)).strip())  
+
+uniprot.head()
+
+uniprot.shape
+
+targetname = pd.read_table("targetName.txt",header=0)
+
+targetname.head()
+
+withsymbol = pd.merge(targetname,uniprot,left_on = "Target name",right_on ="protein_2",how="left")
+
+withsymbol.head(3)
+
+withsymbol = withsymbol.iloc[:,[1,2,12]]
+
+withsymbol = withsymbol.dropna()
+
+withsymbol["genesymbol"].drop_duplicates().shape
