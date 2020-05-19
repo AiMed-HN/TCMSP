@@ -1,0 +1,139 @@
+import pandas as pd
+import os
+
+DrugLibrary = r"F:\myresearch\TCM\druglibrary"       ##药库目录
+workpath = r"F:\myresearch\TCM\射干麻黄汤"       ##工作目录
+DiseaseGeneLibrary = r"F:\myresearch\TCM\GeneCard"         ##  疾病基因库目录
+
+os.chdir(workpath)
+prescription = pd.read_table("prescription.txt",header=0)     
+
+prescription
+
+ingredients = pd.DataFrame()
+targets = pd.DataFrame()
+
+'''
+把药方中的药物ingredient和target分别合并成一个文件，生成ingredients.txt和targets.txt文件。
+计算单药成分数和靶点数
+'''
+for drug in prescription["drug"]:
+    drugpath = os.path.join(DrugLibrary,drug)
+    if os.path.exists(drugpath) == True:
+        ingredient = drugpath+"\\ingredients.txt"
+        ingredient = pd.read_table(ingredient,header=None,names=["Mol ID","Molecule Name","MW","AlogP","Hdon","Hacc","OB (%)","Caco-2","BBB","DL","FASA-","HL","Save"])
+        target = drugpath+"\\targets.txt"
+        target = pd.read_table(target,header=None,names=["Mol ID","Molecule name","Target name","Source","status"])
+        ingredients = ingredients.append(ingredient)
+        targets = targets.append(target)
+        print(drug+" 成分"+str(ingredient.shape[0])+" 靶点"+str(target.shape[0])+"  添加完毕！")
+    else:   
+        print(drug," 不存在！！")
+
+ingredients.shape   ##总成份数
+
+ingredients["Molecule Name"].drop_duplicates().shape   ##   成分去重后计数
+
+targets.shape
+
+#### 写入总ingerdients和总targets
+
+ingredients.to_csv("ingredients.txt",sep="\t",index=0)
+targets.to_csv("targets.txt",sep = "\t",index = 0)
+
+targetName = targets[targets["Mol ID"].apply(lambda x:x in list(ingredients["Mol ID"]))].iloc[:,0:3]      
+##  保留targets文件中 mol在ingrediets中存在的相应数据行
+
+targetName.shape     ##  筛选后成分对应靶点数
+
+targetName.to_csv("targetName.txt",sep = "\t",index = 0)    ## 写入药方总ingredient和targetName文件
+
+#### 通过uniprot库文件，添加相应gene symbol
+
+uniprot = pd.read_table("uniprot.tsv",header=0)
+
+#uniprot.shape
+
+#uniprot.Organism.value_counts()
+
+#uniprot.Status.value_counts()
+
+uniprot = uniprot[uniprot.Status == "reviewed"]
+
+uniprot.shape
+
+uniprot.head()
+
+import re
+
+uniprot["protein_1"] = uniprot["Protein names"].apply(lambda x:re.sub('\(.*$',"",x).strip())
+
+uniprot["protein_1"].apply(lambda x:"[" in x).value_counts()
+
+uniprot["protein_2"] = uniprot["protein_1"].apply(lambda x:re.sub('\[.*$',"",x).strip())
+
+# uniprot.info()
+
+uniprot["genesymbol"] = uniprot["Gene names"].apply(lambda x:re.sub('\s.*$',"",str(x)).strip())     ## Gene name 列需用str()处理
+
+targetname = pd.read_table("targetName.txt",header=0)
+
+# targetname.head()
+
+targetSymbol = pd.merge(targetname,uniprot,left_on = "Target name",right_on ="protein_2",how="left")
+
+targetSymbol = targetSymbol.iloc[:,[0,1,2,12]]
+
+targetSymbol = targetSymbol.dropna()
+
+targetSymbol.head(3)
+
+targetSymbol["genesymbol"].drop_duplicates().shape
+
+targetSymbol.shape
+
+targetSymbol.to_csv("TargetSymbol.txt",sep = "\t",index = 0)    ## 写入TargetSymbol文件
+
+#### 制作各种基因列表
+
+targetSymbol["genesymbol"].to_csv("Drug.txt",header = None,index = 0)       ##  药物相关基因列表，总表
+
+targetSymbol["Molecule name"].drop_duplicates().to_csv("mol.txt",index = 0, header = 0)      ## 药物成分总表
+
+targetSymbol["genesymbol"].drop_duplicates().shape     ## 药物相关基因数
+
+genecards = ["GeneCards-SearchResults(MERS).csv","GeneCards-SearchResults(SARS).csv"]    ## genecard 文件列表
+
+disease = pd.DataFrame()
+
+'''
+合并genecard文件
+'''
+for card in genecards:
+    diseasecard = os.path.join("..","GeneCard",card)
+    diseasegene = pd.read_csv(diseasecard)
+    disease = disease.append(diseasegene)
+    print(diseasegene.shape)
+
+#disease.shape
+
+disease["Gene Symbol"].to_csv("Disease.txt",header = None,index = 0)                ##  疾病相关基因
+
+drug_disease = pd.DataFrame(set(targetSymbol["genesymbol"]).intersection(set(disease["Gene Symbol"])))
+
+drug_disease.to_csv("drug_disease.txt",header = None,index = 0)                   ## 药方与疾病基因交集
+
+#### degree和betweenness centrality 统计
+
+module = pd.read_csv("string_interactions.tsv default node.csv")
+
+MeanDegree = module.Degree.mean()
+
+MeanBet = module.BetweennessCentrality.mean()
+
+AboveMeanDegree = len(module[module["Degree"]>MeanDegree])
+
+AboveMeanBte = len(module[module["BetweennessCentrality"]>MeanBet])
+
+print("节点的平均degree为"+str(round(MeanDegree,3))+"，有"+str(AboveMeanDegree)+"个节点高于平均degree。平均节点中心度为"+
+      str(round(MeanBet,3))+"，有"+str(AboveMeanBte)+"个节点的节点中心度高于平均值。")
